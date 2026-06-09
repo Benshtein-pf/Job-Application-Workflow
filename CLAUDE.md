@@ -61,7 +61,9 @@ The model never generates HTML directly — only structured data.
 
 **How to run (Claude cowork):**
 1. Open `~/Documents/job-application-automation` in Cowork.
-2. Paste `tailoring/COWORK_PROMPT.txt`, or `tailoring/TAILOR_PROMPT.txt` followed by the job description.
+2. Paste your personalized `COWORK_PROMPT.txt`, or `TAILOR_PROMPT.txt` followed by the job
+   description, from `private-files/{timestamp}-generated-prompts/`. The `tailoring/` versions are
+   generic templates; setup generates personalized copies into that gitignored folder.
 
 **Setup (one-time):**
 ```bash
@@ -76,6 +78,7 @@ SETUP comment for details.
 - `tailoring/Base-CV.html` — base CV template (also deployed to `~/Documents/job-application-automation/CVs/base/`)
 - `tailoring/candidate_context.md` — authoritative background facts not in the CV
 - `tailoring/render-cv.js` — converts `resume.json` → `{First-Last}.html` + `{First-Last}.pdf`
+- `scripts/apply/staged-apply.py` — after tailoring, walks the most recent tailored CVs (up to 15) one at a time: opens each job's apply URL (looked up in the CSV by `job_id`) in the default browser and opens the CV folder. Asks once which OS you're on (WINDOWS/LINUX/MAC) and waits for Enter between jobs. Run with `python3.11 scripts/apply/staged-apply.py` (`--count N` to change the batch size). See `scripts/apply/README.md`
 - `~/Documents/job-application-automation/resume-template.json` — personal data template (pre-filled, gitignored)
 - Tailored output: `~/Documents/job-application-automation/CVs/tailored/{job_id}/resume.json` + `.{html,pdf}`
 
@@ -175,6 +178,15 @@ tailoring/
   Base-CV.pdf              Base CV (PDF reference copy)
   candidate_context.md     Background facts for tailoring
 
+scripts/
+  README.md                Index of helper scripts
+  apply/
+    staged-apply.py        Staged apply: opens each tailored job's apply URL + CV folder, one at a time
+    README.md              What the apply script does and how to run it
+  linkedin-skills/
+    scrape-linkedin-skills.js  Setup helper: scrapes full per-role skills from LinkedIn (MCP truncates these)
+    README.md              What the scraper does and how to run it
+
 application/
   SUBMISSION_PROMPT.md     Application submission prompt
 
@@ -189,6 +201,7 @@ autofill-chrome-extension/
 private-files/             Gitignored — personal data files go here
   candidate-data.json      Real candidate data (copied to autofill-chrome-extension/ locally)
   resume-template.json     Personal version of the template (pre-filled)
+  {timestamp}-generated-prompts/   Personalized COWORK/TAILOR prompts (paste into Cowork)
 
 package.json               Playwright dependency (npm install from repo root)
 node_modules/              Playwright runtime

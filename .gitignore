@@ -25,9 +25,15 @@ env/
 private-files/
 .claude/settings.local.json
 
+# Personal base CV + LinkedIn export (keep the generic Base-CV.html tracked)
+tailoring/*-CV.html
+!tailoring/Base-CV.html
+tailoring/*-Profile.pdf
+
 # CV PDFs — generated from local HTML, not for version control
 tailoring/Base-CV.pdf
 
 # Node
 node_modules/
 tailoring/node_modules/
+package-lock.json
