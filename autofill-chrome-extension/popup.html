@@ -44,10 +44,25 @@
     }
     input:checked + .slider { background: #0a66c2; }
     input:checked + .slider::before { transform: translateX(18px); }
+    .fill-btn {
+      display: block;
+      width: calc(100% - 32px);
+      margin: 4px 16px 14px;
+      padding: 10px 12px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #fff;
+      background: #0a66c2;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .fill-btn:disabled { background: #99c2e8; cursor: default; }
   </style>
 </head>
 <body>
   <header>Job Autofill</header>
+  <button id="fill-now" class="fill-btn">Autofill This Page</button>
   <div class="row">
     <div>
       <div class="label">Auto-Apply Redirect</div>

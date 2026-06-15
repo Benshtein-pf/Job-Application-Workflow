@@ -762,6 +762,19 @@
   if (document.body) watchTrigger();
   else document.addEventListener('DOMContentLoaded', watchTrigger);
 
+  // ─── Manual trigger from popup button ───────────────────────────────────
+  chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    if (msg?.type !== 'job-autofill-run') return;
+    runFill(msg.jobId || '').then(() => {
+      sendResponse({
+        ok: true,
+        skipped: JSON.parse(document.body.getAttribute('data-fill-skipped') || '[]'),
+        resumeInput: JSON.parse(document.body.getAttribute('data-resume-input') || 'null'),
+      });
+    });
+    return true; // keep message channel open for async response
+  });
+
   // ─── LinkedIn: Auto-Apply Redirect toggle ──────────────────────────────────
   function initLinkedInAutoApply() {
     if (!location.hostname.endsWith('linkedin.com')) return;

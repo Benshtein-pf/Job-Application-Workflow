@@ -94,7 +94,7 @@ Do NOT stop. Do NOT ask for confirmation. Continue to step 3 regardless.
 Read ~/Documents/job-application-automation/CVs/base/YOUR_NAME_SLUG-CV.html
 Read ~/Documents/job-application-automation/candidate_context.md
 
-NOTE: Read this from ~/Documents/job-application-automation/ — NOT from ~/repos/.
+NOTE: Read this from ~/Documents/job-application-automation/ - NOT from ~/repos/.
   The ~/repos/ copy is an unfilled template and must never be used.
 
 These two files are the only sources of truth for all experience, companies,
@@ -231,7 +231,10 @@ rewrite it as a concise technical summary focused on systems, technologies, scop
   Example: if the JD says "observability", and a bullet mentions "monitoring dashboards",
   reframe it as "implemented observability infrastructure..."
 - Do NOT invent new bullets or new achievements.
-- Write a maximum of 4 bullets per job. If the base CV has 5, drop the least relevant one for this JD.
+- Write a maximum of 4 bullets per job. If the base CV has 5 or more bullets for a role, drop the least relevant one.
+  If the base CV has 4 or fewer, keep them all — never reduce to fewer bullets than the base CV has.
+- BEFORE saving the JSON, count the bullets in each role in the base CV and verify your JSON has the same count
+  (or one fewer if the base had 5+). If any role has fewer bullets than the base CV, add the missing ones back.
 - No bullet may exceed 180 characters.
 - If you write a bullet over 140 characters, balance it with at least one bullet under 120 characters
   in the same job. A long bullet is fine; all bullets being long is not.
@@ -291,4 +294,7 @@ These rules override everything else in this prompt:
 - Write the resume.json for this specific job only. Do not batch-generate multiple JSON files in one pass.
 </non_negotiables>
 
+<constraints>
+- Do NOT write any files outside of ~/Documents/job-application-automation/ and ~/repos/job-application-automation/.
+</constraints>
 </prompt>
