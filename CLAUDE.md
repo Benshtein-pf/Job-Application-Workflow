@@ -63,10 +63,28 @@ The model never generates HTML directly — only structured data.
 1. Open `~/Documents/job-application-automation` in Cowork.
 2. Paste `tailoring/COWORK_PROMPT.txt`, or `tailoring/TAILOR_PROMPT.txt` followed by the job description.
 
-**Setup (one-time):**
+**Setup (one-time, per machine):**
 ```bash
 # Install Playwright (run from repo root)
-npm install playwright && npx playwright install chromium
+npm install playwright
+
+# Install Chromium (run from repo root)
+npx playwright install chromium-headless-shell
+```
+
+**Cowork sessions:** Run these two commands at the start of each Cowork session before running render-cv.js:
+```bash
+# 1. Install Chromium headless shell
+cd ~/repos/job-application-automation && npx playwright install chromium-headless-shell
+
+# 2. Extract libXdamage (the sandbox is missing this system library — no root needed)
+cd ~ && apt-get download libxdamage1 2>/dev/null && dpkg-deb -x libxdamage1_*.deb libxdamage_extracted
+```
+
+Then prefix any `node render-cv.js` call with the library path:
+```bash
+LD_LIBRARY_PATH=~/libxdamage_extracted/usr/lib/aarch64-linux-gnu \
+  node ~/repos/job-application-automation/tailoring/render-cv.js <resume.json>
 ```
 Also create `~/Documents/job-application-automation/resume-template.json` — copy the generic
 template from `tailoring/resume-template.json` and fill in your personal info. See the prompts'
@@ -108,11 +126,19 @@ submit button — never clicking it.
 ### 4. Autofill Chrome Extension (`autofill-chrome-extension/`)
 
 Manifest V3 content script that fills job application forms when triggered by
-Cowork via DOM data attributes.
+Cowork via DOM data attributes, or manually via the extension popup button.
 
 **Install (load unpacked):**
 1. Open `chrome://extensions`, enable Developer Mode.
 2. Click "Load unpacked" and select `autofill-chrome-extension/`.
+
+**Manual trigger (popup button):**
+Click the extension icon and press "Autofill This Page" to run the fill
+logic on the active tab without any Cowork/DOM setup. The popup sends a
+`{ type: 'job-autofill-run' }` message to the content script via
+`chrome.tabs.sendMessage`, which calls `runFill('')` directly and shows
+"Done!" or "Done (N skipped)" based on the response. No `job_id` is set in
+this mode, so the resume path in `data-resume-input` falls back to empty.
 
 **Trigger protocol (how Cowork activates the extension):**
 ```javascript
