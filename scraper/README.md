@@ -1,6 +1,6 @@
 # job-scraper
 
-Scrapes LinkedIn and Indeed for backend/software engineering jobs in Tel Aviv District, deduplicates against a local CSV tracker, and appends new results.
+Scrapes LinkedIn and Indeed for backend/software engineering jobs in Tel Aviv District, deduplicates against a local SQLite tracker, and inserts new results.
 
 ## Requirements
 
@@ -22,13 +22,14 @@ python3.11 main.py
 python3.11 main.py --full-sync
 ```
 
-Results are appended to `~/Documents/job_tracker.csv`.
+Results are inserted into `~/Documents/job-application-automation/job_tracker.db` (SQLite).
+Migrate an existing CSV once with `python3 migrate_csv_to_sqlite.py`.
 
 ## What it does
 
 - Scrapes **LinkedIn** with 3 search terms: `senior backend engineer`, `senior software engineer`, `backend engineer`
 - Scrapes **Indeed** with a title-scoped query to avoid irrelevant results: `title:(backend OR fullstack OR "full stack") engineer`
-- Deduplicates against existing `job_url` entries in the CSV
+- Deduplicates against existing `job_url` entries in the DB (`INSERT OR IGNORE`)
 - Filters out irrelevant titles (managers, frontend, DevOps, QA, etc.)
 - Filters to Tel Aviv District only
 - Prints a summary with a count check
@@ -40,7 +41,8 @@ All configuration lives at the top of `main.py`.
 ### Change the output file
 
 ```python
-CSV_PATH = Path.home() / "Documents" / "job_tracker.csv"
+# scraper/sqlite.py
+DB_PATH = Path.home() / "Documents" / "job-application-automation" / "job_tracker.db"
 ```
 
 Point this to any path you like.
@@ -62,7 +64,7 @@ ALLOWED_DISTRICTS = [
 ]
 ```
 
-LinkedIn typically uses `"<District/Region name>"`. Indeed uses a state/region code suffix like `", CA, US"` for California or `", ON, CA"` for Ontario. Run the script once and check the raw `location` values printed in the CSV to confirm the exact format for your area.
+LinkedIn typically uses `"<District/Region name>"`. Indeed uses a state/region code suffix like `", CA, US"` for California or `", ON, CA"` for Ontario. Run the script once and check the raw `location` values stored in the DB (e.g. `python3 sqlite.py list --limit 5`) to confirm the exact format for your area.
 
 For Indeed, also update `country_indeed` in `_do_scrape`:
 
@@ -110,7 +112,7 @@ The default incremental run scrapes the last 24 hours. `--full-sync` scrapes the
 hours_old = 168 if full_sync else 24
 ```
 
-## Output CSV columns
+## Tracker columns
 
 | Column | Description |
 |---|---|

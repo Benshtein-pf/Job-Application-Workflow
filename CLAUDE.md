@@ -8,13 +8,16 @@ application forms — stopping before the submit button.
 ## Pipeline overview
 
 ```
-scraper  →  CSV (status="new")
-         →  tailoring Cowork  →  CSV (status="tailored")  +  tailored PDF
-         →  submission Cowork →  CSV (status="applied")   +  form filled, waiting for manual submit
+scraper  →  SQLite (status="new")
+         →  tailoring Cowork  →  SQLite (status="tailored")  +  tailored PDF
+         →  submission Cowork →  SQLite (status="applied")   +  form filled, waiting for manual submit
 ```
 
-Central state lives entirely in `~/Documents/job-application-automation/job_tracker.csv`.
-No database. The `status` column drives every step.
+Central state lives entirely in the SQLite database at
+`~/Documents/job-application-automation/job_tracker.db` (stdlib `sqlite3`, WAL mode — no
+server, no third-party dependency). The `status` column drives every step. All access goes
+through `scraper/sqlite.py`: the scraper imports it; the Cowork prompts call its CLI
+(`list` / `set-status`).
 
 ---
 
@@ -39,9 +42,12 @@ All config is at the top of `scraper/main.py`:
 - `EXCLUDE_TITLE_KEYWORDS` — title-level filter (DevOps, QA, junior, etc.)
 - `BLACKLISTED_COMPANIES` — companies to skip
 - `ALLOWED_DISTRICTS` — location filter
-- `CSV_PATH` — `~/Documents/job-application-automation/job_tracker.csv`
 
-Each new job appended with `status = "new"`. `job_id` is an MD5 of the URL.
+The DB path (`DB_PATH`) and schema live in `scraper/sqlite.py`
+(`~/Documents/job-application-automation/job_tracker.db`).
+
+Each new job is inserted with `status = "new"` via `INSERT OR IGNORE` (dedup on
+`job_id` / `job_url`). `job_id` is an MD5 of the URL.
 
 ---
 
@@ -51,7 +57,7 @@ Two Claude Code prompts — use the right one for the task:
 
 | Prompt | Use case |
 |---|---|
-| `COWORK_PROMPT.txt` | Batch: reads CSV, processes all `status="new"` rows (up to 15) |
+| `COWORK_PROMPT.txt` | Batch: reads the DB, processes all `status="new"` rows (up to 15) |
 | `TAILOR_PROMPT.txt` | Single job: paste/give a URL or raw JD text |
 
 **How it works:**
@@ -107,15 +113,15 @@ submit button — never clicking it.
 
 **How to run:**
 1. Paste `application/SUBMISSION_PROMPT.md` as your prompt in Claude Cowork.
-2. Cowork reads the CSV, takes up to 15 `status="tailored"` rows, opens them
-   in Chrome (groups of 3), and processes each form.
+2. Cowork reads the DB (via `scraper/sqlite.py`), takes up to 15 `status="tailored"`
+   rows, opens them in Chrome (groups of 3), and processes each form.
 
 **What Cowork does:**
 - Triggers the autofill extension via body data attributes (see below).
 - Uploads `CVs/tailored/{job_id}/{candidate-name}.pdf` via `mcp__claude-in-chrome__file_upload`.
 - Fills any fields the extension missed (years exp, salary, notice period, etc.).
 - Stops at the submit button and alerts you.
-- Updates CSV status and appends missed-field bugs to `autofill_issues.md`.
+- Updates the job's DB status (via `sqlite.py set-status`) and appends missed-field bugs to `autofill_issues.md`.
 
 **Hard constraints:**
 - NEVER click submit. NEVER log in. NEVER write a cover letter.
@@ -190,10 +196,12 @@ relocate, or cover letter fields — those are Cowork's responsibility.
 ```
 scraper/
   main.py                  Scraper script
-  CLAUDE.md                Scraper-specific guidance
+  sqlite.py                SQLite storage layer: schema + connection + CLI (list / set-status)
+  migrate_csv_to_sqlite.py One-time CSV -> SQLite import
+  README.md                Scraper-specific guidance
 
 tailoring/
-  COWORK_PROMPT.txt        Batch tailoring prompt (reads CSV)
+  COWORK_PROMPT.txt        Batch tailoring prompt (reads/updates the DB via sqlite.py)
   TAILOR_PROMPT.txt        Single-job tailoring prompt
   render-cv.js             Converts resume.json -> HTML + PDF via Playwright
   resume-template.json     Generic template (copy to ~/Documents/…, fill in personal info)
@@ -220,7 +228,8 @@ package.json               Playwright dependency (npm install from repo root)
 node_modules/              Playwright runtime
 
 ~/Documents/job-application-automation/   (runtime data, not in repo)
-  job_tracker.csv
+  job_tracker.db           SQLite tracker (source of truth; WAL -wal/-shm sidecars)
+  job_tracker.csv          Legacy CSV (kept after one-time migration; no longer written)
   autofill_issues.md
   resume-template.json     Personal template — filled in during setup
   CVs/base/Base-CV.html
@@ -232,7 +241,7 @@ node_modules/              Playwright runtime
 
 ---
 
-## CSV status lifecycle
+## Status lifecycle
 
 | Status | Set by | Meaning |
 |---|---|---|

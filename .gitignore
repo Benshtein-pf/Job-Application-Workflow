@@ -31,3 +31,4 @@ tailoring/Base-CV.pdf
 # Node
 node_modules/
 tailoring/node_modules/
+package-lock.json
