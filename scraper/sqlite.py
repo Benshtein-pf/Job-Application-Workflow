@@ -106,6 +106,38 @@ def insert_jobs(conn: sqlite3.Connection, rows) -> int:
     return cur.rowcount
 
 
+def set_status(
+    conn: sqlite3.Connection,
+    job_id: str,
+    status: str,
+    note: str | None = None,
+    applied_date: str | None = None,
+) -> int:
+    """Update a job's status, and optionally its notes / applied_date.
+
+    Returns the number of rows updated (0 when no job has that job_id). Raises
+    ValueError if status is not one of VALID_STATUSES. Shared by the CLI
+    (set-status) and importing callers (e.g. apply/staged-apply.py) so status
+    writes go through one validated code path."""
+    if status not in VALID_STATUSES:
+        raise ValueError(
+            f"invalid status {status!r}; valid: {', '.join(VALID_STATUSES)}"
+        )
+    sets = ["status = ?"]
+    params: list = [status]
+    if note is not None:
+        sets.append("notes = ?")
+        params.append(note)
+    if applied_date is not None:
+        sets.append("applied_date = ?")
+        params.append(applied_date)
+    params.append(job_id)
+    sql = f"UPDATE jobs SET {', '.join(sets)} WHERE job_id = ?"
+    with conn:  # transaction: commit on success, rollback on error
+        cur = conn.execute(sql, params)
+    return cur.rowcount
+
+
 # --------------------------------------------------------------------------- CLI
 
 
@@ -132,30 +164,19 @@ def _cmd_list(args: argparse.Namespace) -> int:
 
 
 def _cmd_set_status(args: argparse.Namespace) -> int:
-    if args.status not in VALID_STATUSES:
-        print(
-            f"error: invalid status '{args.status}'. "
-            f"Valid: {', '.join(VALID_STATUSES)}",
-            file=sys.stderr,
-        )
-        return 2
-    sets = ["status = ?"]
-    params: list = [args.status]
-    if args.note is not None:
-        sets.append("notes = ?")
-        params.append(args.note)
-    if args.applied_date is not None:
-        sets.append("applied_date = ?")
-        params.append(args.applied_date)
-    params.append(args.job_id)
-    sql = f"UPDATE jobs SET {', '.join(sets)} WHERE job_id = ?"
-
     conn = get_connection()
     init_db(conn)
-    with conn:
-        cur = conn.execute(sql, params)
-    conn.close()
-    if cur.rowcount == 0:
+    try:
+        rowcount = set_status(
+            conn, args.job_id, args.status,
+            note=args.note, applied_date=args.applied_date,
+        )
+    except ValueError as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 2
+    finally:
+        conn.close()
+    if rowcount == 0:
         print(f"error: no job with job_id '{args.job_id}'", file=sys.stderr)
         return 1
     print(f"ok: {args.job_id} -> {args.status}")
