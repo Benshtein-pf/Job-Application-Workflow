@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
 """Job scraper using python-jobspy. Scrapes LinkedIn and Indeed, deduplicates against
-~/Documents/job_tracker.csv, filters by title relevance, and appends new results."""
+the SQLite job tracker, filters by title relevance, and inserts new results."""
 
 import argparse
 import hashlib
 import random
 import time
-from pathlib import Path
 
 import pandas as pd
 from jobspy import scrape_jobs
 
-CSV_PATH = Path.home() / "Documents" / "job-application-automation" / "job_tracker.csv"
+import sqlite as db
 
 SEARCH_TERMS = [
     "senior backend engineer",
@@ -42,21 +41,11 @@ ALLOWED_DISTRICTS = [
     ", TA, IL",           # Indeed format (Tel Aviv state code)
 ]
 
-CSV_COLUMNS = [
-    "job_id", "date_found", "company", "title", "location",
-    "is_remote", "job_url", "apply_url", "platform", "description", "status", "applied_date", "notes",
-]
-
-
-def load_existing_urls() -> set[str]:
-    if not CSV_PATH.exists():
-        return set()
-    df = pd.read_csv(CSV_PATH, usecols=["job_url"], dtype=str)
-    return set(df["job_url"].dropna())
-
 
 def make_job_id(url: str) -> str:
-    return hashlib.md5(url.encode()).hexdigest()
+    # Non-cryptographic dedup key (not a security primitive). usedforsecurity=False
+    # documents that and avoids ValueError on FIPS-enabled builds.
+    return hashlib.md5(url.encode(), usedforsecurity=False).hexdigest()
 
 
 def title_is_relevant(title: str) -> bool:
@@ -142,8 +131,10 @@ def run(full_sync: bool) -> None:
     raw.drop_duplicates(subset="job_url", inplace=True)
     within_batch_dupes = before_dedup - len(raw)
 
-    existing_urls = load_existing_urls()
-    is_new = ~raw["job_url"].isin(existing_urls)
+    conn = db.get_connection()
+    db.init_db(conn)
+    existing = db.existing_urls(conn)
+    is_new = ~raw["job_url"].isin(existing)
     dupes = int((~is_new).sum())
     new = raw[is_new].copy()
 
@@ -172,7 +163,7 @@ def run(full_sync: bool) -> None:
     else:
         filtered_blacklist = 0
 
-    # Build rows for the CSV
+    # Build rows to insert
     today = pd.Timestamp.now().strftime("%Y-%m-%d")
     out = pd.DataFrame({
         "job_id": new["job_url"].apply(make_job_id),
@@ -190,10 +181,15 @@ def run(full_sync: bool) -> None:
         "notes": "",
     })
 
-    # Append to CSV
+    # Insert into the SQLite tracker (INSERT OR IGNORE dedups on job_id / job_url)
+    inserted = 0
     if not out.empty:
-        write_header = not CSV_PATH.exists()
-        out.to_csv(CSV_PATH, mode="a", header=write_header, index=False, columns=CSV_COLUMNS)
+        rows = []
+        for rec in out[db.COLUMNS].to_dict("records"):
+            rec["is_remote"] = int(bool(rec["is_remote"]))  # numpy bool -> 0/1 int
+            rows.append(tuple(rec[col] for col in db.COLUMNS))
+        inserted = db.insert_jobs(conn, rows)
+    conn.close()
 
     # Summary
     added = len(out)
@@ -207,6 +203,8 @@ def run(full_sync: bool) -> None:
     print(f"New jobs added:         {added}")
     print(f"  (check: {within_batch_dupes} + {dupes} + {filtered_out} + {filtered_location} + {filtered_blacklist} + {added} = {within_batch_dupes + dupes + filtered_out + filtered_location + filtered_blacklist + added} / {total_scraped})")
     print(f"{'='*60}")
+    if inserted != added:
+        print(f"NOTE: {added - inserted} of {added} already present in DB (INSERT OR IGNORE skipped them)")
     if added:
         print("\nNew jobs:")
         for _, row in out.iterrows():

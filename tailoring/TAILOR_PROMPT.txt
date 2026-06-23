@@ -24,7 +24,7 @@ This workflow is purely: read JD - assess - tailor - render PDF.
 </context>
 
 <key_files>
-- Job tracker:        ~/Documents/job-application-automation/job_tracker.csv
+- Job tracker:        ~/Documents/job-application-automation/job_tracker.db  (SQLite; this single-job flow does not update it)
 - Base CV (HTML):     ~/Documents/job-application-automation/CVs/base/YOUR_NAME_SLUG-CV.html
 - Candidate context:  ~/Documents/job-application-automation/candidate_context.md
 - Resume JSON:        ~/Documents/job-application-automation/CVs/tailored/{slug}/resume.json  (you create)
